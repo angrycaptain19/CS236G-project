@@ -168,7 +168,9 @@ class Network:
             raise ValueError("Network output shapes not defined. Please call x.set_shape() where applicable.")
         if any(not isinstance(comp, Network) for comp in self.components.values()):
             raise ValueError("Components of a Network must be Networks themselves.")
-        if len(self.components) != len(set(comp.name for comp in self.components.values())):
+        if len(self.components) != len(
+            {comp.name for comp in self.components.values()}
+        ):
             raise ValueError("Components of a Network must have unique names.")
 
         # List inputs and outputs.
@@ -200,7 +202,7 @@ class Network:
     def get_output_for(self, *in_expr: TfExpression, return_as_list: bool = False, **dynamic_kwargs) -> Union[TfExpression, List[TfExpression]]:
         """Construct TensorFlow expression(s) for the output(s) of this network, given the input expression(s)."""
         assert len(in_expr) == self.num_inputs
-        assert not all(expr is None for expr in in_expr)
+        assert any(expr is not None for expr in in_expr)
 
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
@@ -214,10 +216,10 @@ class Network:
             valid_inputs = [expr for expr in in_expr if expr is not None]
             final_inputs = []
             for expr, name, shape in zip(in_expr, self.input_names, self.input_shapes):
-                if expr is not None:
-                    expr = tf.identity(expr, name=name)
-                else:
+                if expr is None:
                     expr = tf.zeros([tf.shape(valid_inputs[0])[0]] + shape[1:], name=name)
+                else:
+                    expr = tf.identity(expr, name=name)
                 final_inputs.append(expr)
             out_expr = self._build_func(*final_inputs, **build_kwargs)
 
@@ -255,15 +257,17 @@ class Network:
 
     def __getstate__(self) -> dict:
         """Pickle export."""
-        state = dict()
-        state["version"]            = 3
-        state["name"]               = self.name
-        state["static_kwargs"]      = dict(self.static_kwargs)
-        state["components"]         = dict(self.components)
-        state["build_module_src"]   = self._build_module_src
-        state["build_func_name"]    = self._build_func_name
-        state["variables"]          = list(zip(self.own_vars.keys(), tfutil.run(list(self.own_vars.values()))))
-        return state
+        return {
+            "version": 3,
+            "name": self.name,
+            "static_kwargs": dict(self.static_kwargs),
+            "components": dict(self.components),
+            "build_module_src": self._build_module_src,
+            "build_func_name": self._build_func_name,
+            "variables": list(
+                zip(self.own_vars.keys(), tfutil.run(list(self.own_vars.values())))
+            ),
+        }
 
     def __setstate__(self, state: dict) -> None:
         """Pickle import."""
@@ -517,7 +521,7 @@ class Network:
             num_params = sum(np.prod(tfutil.shape_to_list(var.shape)) for var in layer_trainables)
             weights = [var for var in layer_trainables if var.name.endswith("/weight:0")]
             weights.sort(key=lambda x: len(x.name))
-            if len(weights) == 0 and len(layer_trainables) == 1:
+            if not weights and len(layer_trainables) == 1:
                 weights = layer_trainables
             total_params += num_params
 
@@ -559,7 +563,7 @@ _print_legacy_warning = True
 def _handle_legacy_output_transforms(output_transform, dynamic_kwargs):
     global _print_legacy_warning
     legacy_kwargs = ["out_mul", "out_add", "out_shrink", "out_dtype"]
-    if not any(kwarg in dynamic_kwargs for kwarg in legacy_kwargs):
+    if all(kwarg not in dynamic_kwargs for kwarg in legacy_kwargs):
         return output_transform, dynamic_kwargs
 
     if _print_legacy_warning:

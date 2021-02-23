@@ -260,7 +260,6 @@ def calculate_activation_statistics_from_files(files, sess, batch_size=50, verbo
 def check_or_download_inception(inception_path):
     ''' Checks if the path to the inception file is valid, or downloads
         the file if it is not present. '''
-    INCEPTION_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
     if inception_path is None:
         inception_path = '/tmp'
     inception_path = pathlib.Path(inception_path)
@@ -269,6 +268,7 @@ def check_or_download_inception(inception_path):
         print("Downloading Inception model")
         from urllib import request
         import tarfile
+        INCEPTION_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
         fn, _ = request.urlretrieve(INCEPTION_URL)
         with tarfile.open(fn, mode='r') as f:
             f.extract('classify_image_graph_def.pb', str(model_file.parent))
@@ -277,7 +277,7 @@ def check_or_download_inception(inception_path):
 
 def _handle_path(path, sess, low_profile=False):
     #if path.endswith('.npz'):
-    if path.endswith('.npz') and not "sample" in path:
+    if path.endswith('.npz') and "sample" not in path:
         f = np.load(path)
         try:
             m, s = f['mu'][:], f['sigma'][:]
@@ -285,7 +285,7 @@ def _handle_path(path, sess, low_profile=False):
             m, s = f['pool_mean'][:], f['pool_var'][:]
         f.close()
     else:
-        
+
         #     m, s = calculate_activation_statistics_from_files(files, sess)
         # else:
         if os.path.isdir(path):
@@ -293,7 +293,7 @@ def _handle_path(path, sess, low_profile=False):
             files = list(path.glob('*.jpg')) + list(path.glob('*.png'))[:25000]
             print("the total files are ", len(files))
             x = np.array([imread(str(fn)).astype(np.float32) for fn in files])
-           
+
         elif path.endswith("npy") :
             x = np.load(path)
             print(x.shape, np.min(x), np.max(x))
@@ -302,7 +302,7 @@ def _handle_path(path, sess, low_profile=False):
             x = x.swapaxes(1,2).swapaxes(2,3) 
         m, s = calculate_activation_statistics(x, sess)
         # del x #clean up memory
-        del x 
+        del x
     return m, s
 
 
@@ -319,8 +319,7 @@ def calculate_fid_given_paths(paths, inception_path, low_profile=False):
         sess.run(tf.global_variables_initializer())
         m1, s1 = _handle_path(paths[0], sess, low_profile=low_profile)
         m2, s2 = _handle_path(paths[1], sess, low_profile=low_profile)
-        fid_value = calculate_frechet_distance(m1, s1, m2, s2)
-        return fid_value
+        return calculate_frechet_distance(m1, s1, m2, s2)
 
 
 if __name__ == "__main__":

@@ -244,12 +244,11 @@ def run_wrapper(submit_config: SubmitConfig) -> None:
     except:
         if is_local:
             raise
-        else:
-            traceback.print_exc()
+        traceback.print_exc()
 
-            log_src = os.path.join(submit_config.run_dir, "log.txt")
-            log_dst = os.path.join(get_path_from_template(submit_config.run_dir_root), "{0}-error.txt".format(submit_config.run_name))
-            shutil.copyfile(log_src, log_dst)
+        log_src = os.path.join(submit_config.run_dir, "log.txt")
+        log_dst = os.path.join(get_path_from_template(submit_config.run_dir_root), "{0}-error.txt".format(submit_config.run_name))
+        shutil.copyfile(log_src, log_dst)
     finally:
         open(os.path.join(submit_config.run_dir, "_finished.txt"), "w").close()
 
@@ -283,8 +282,9 @@ def submit_run(submit_config: SubmitConfig, run_func_name: str, **run_func_kwarg
         pprint.pprint(submit_config, indent=4, width=200, compact=False)
         print()
 
-    if submit_config.ask_confirmation:
-        if not util.ask_yes_no("Continue submitting the job?"):
-            return
+    if submit_config.ask_confirmation and not util.ask_yes_no(
+        "Continue submitting the job?"
+    ):
+        return
 
     run_wrapper(submit_config)
